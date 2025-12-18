@@ -16,7 +16,7 @@ from PIL import Image
 # USER SETTINGS
 # ==========================
 
-IMAGE_FOLDER = "/home/pi/images"
+IMAGE_FOLDER = "/home/pictureframe/images"
 DISPLAY_TIME = 5  # seconds per image
 FRAMEBUFFER = "/dev/fb0"
 
@@ -104,3 +104,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\nExiting cleanly")
+
