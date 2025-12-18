@@ -61,28 +61,15 @@ def index():
     return render_template("index.html", images=images)
 
 @app.route("/upload", methods=["POST"])
+@app.route("/upload", methods=["POST"])
 def upload():
-    """
-    Handle uploaded file
-    """
-    if "file" not in request.files:
-        return "No file part", 400
-
-    file = request.files["file"]
-
-    if file.filename == "":
-        return "No selected file", 400
-
-    if not allowed_file(file.filename):
-        return "File type not allowed", 400
-
-    # Sanitize filename (basic)
-    filename = os.path.basename(file.filename)
-
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(save_path)
-
+    files = request.files.getlist("file")  # support multiple files
+    for file in files:
+        if file.filename and allowed_file(file.filename):
+            filename = os.path.basename(file.filename)
+            file.save(os.path.join(IMAGE_FOLDER, filename))
     return redirect(url_for("index"))
+
 
 # ==========================
 # ENTRY POINT
@@ -91,6 +78,7 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
+
 
 
 
