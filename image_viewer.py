@@ -3,16 +3,18 @@ Framebuffer Image Viewer for Raspberry Pi OS Lite (64-bit, Debian Trixie)
 ------------------------------------------------------------------------
 • No desktop environment required
 • Writes directly to /dev/fb0
-• Ideal base for HDMI now, E-Ink later
-• Designed for Pi Zero 2 W
+• Instant detection of new/deleted images using inotify
 • Handles deleted images gracefully
+• Maintains aspect ratio (no stretching)
 """
 
 import os
 import sys
 import time
 import struct
+import threading
 from PIL import Image
+from inotify_simple import INotify, flags
 
 # ==========================
 # USER SETTINGS
@@ -21,11 +23,34 @@ from PIL import Image
 IMAGE_FOLDER = "/home/pictureframe/images"
 DISPLAY_TIME = 5  # seconds per image
 FRAMEBUFFER = "/dev/fb0"
-RESCAN_INTERVAL = 30  # seconds - how often to refresh the image list
+
+# ==========================
+# GLOBAL STATE
+# ==========================
+
+image_list_lock = threading.Lock()
+image_files = []
+list_updated = threading.Event()
 
 # ==========================
 # HELPER FUNCTIONS
 # ==========================
+
+def hide_cursor():
+    """
+    Hide the blinking cursor in the terminal using ANSI escape codes
+    """
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+
+def show_cursor():
+    """
+    Show the cursor again (for clean exit)
+    """
+    sys.stdout.write("\033[?25h")
+    sys.stdout.flush()
+
 
 def get_screen_resolution():
     """
@@ -96,38 +121,60 @@ def get_image_list():
     Get current list of valid image files
     """
     try:
-        image_files = [
+        files = [
             f for f in os.listdir(IMAGE_FOLDER)
             if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"))
         ]
-        return sorted(image_files)
+        return sorted(files)
     except Exception as e:
         print(f"Error reading image folder: {e}")
         return []
+
+
+def update_image_list():
+    """
+    Update the global image list thread-safely
+    """
+    global image_files
+    new_list = get_image_list()
+    
+    with image_list_lock:
+        if new_list != image_files:
+            image_files = new_list
+            list_updated.set()
+            print(f"📁 Image list updated: {len(image_files)} image(s)")
+
+
+def file_watcher():
+    """
+    Watch the image folder for changes using inotify
+    Runs in a separate thread
+    """
+    print(f"👁️  Watching folder: {IMAGE_FOLDER}")
+    
+    inotify = INotify()
+    watch_flags = flags.CREATE | flags.DELETE | flags.MOVED_TO | flags.MOVED_FROM | flags.CLOSE_WRITE
+    inotify.add_watch(IMAGE_FOLDER, watch_flags)
+    
+    while True:
+        try:
+            events = inotify.read(timeout=1000)
+            if events:
+                # Give a short delay for file writes to complete
+                time.sleep(0.1)
+                update_image_list()
+        except Exception as e:
+            print(f"File watcher error: {e}")
+            time.sleep(1)
 
 
 # ==========================
 # MAIN PROGRAM
 # ==========================
 
-def hide_cursor():
-    """
-    Hide the blinking cursor in the terminal using ANSI escape codes
-    """
-    sys.stdout.write("\033[?25l")
-    sys.stdout.flush()
-
-
-def show_cursor():
-    """
-    Show the cursor again (for clean exit)
-    """
-    sys.stdout.write("\033[?25h")
-    sys.stdout.flush()
-
-
 def main():
-    os.system("echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink > /dev/null 2>&1")
+    global image_files
+    
     # Hide cursor at startup
     hide_cursor()
     
@@ -136,47 +183,57 @@ def main():
 
     print(f"Framebuffer resolution: {screen_width}x{screen_height}")
     print(f"Image folder: {IMAGE_FOLDER}")
-    print(f"Rescanning for new images every {RESCAN_INTERVAL} seconds")
+    print(f"Instant file detection enabled")
     print("-" * 50)
 
-    last_rescan_time = 0
-    image_files = []
+    # Initial image list
+    update_image_list()
+
+    # Start file watcher thread
+    watcher_thread = threading.Thread(target=file_watcher, daemon=True)
+    watcher_thread.start()
+
     current_index = 0
+    last_display_time = 0
 
     # Main display loop
     while True:
-        current_time = time.time()
+        with image_list_lock:
+            current_files = image_files.copy()
         
-        # Rescan for images periodically or if list is empty
-        if not image_files or (current_time - last_rescan_time) >= RESCAN_INTERVAL:
-            print("Scanning for images...")
-            image_files = get_image_list()
-            last_rescan_time = current_time
-            current_index = 0
-            
-            if not image_files:
-                print("No images found. Waiting...")
-                time.sleep(5)
-                continue
-            
-            print(f"Found {len(image_files)} image(s)")
+        # Check if list was updated
+        if list_updated.is_set():
+            list_updated.clear()
+            # Reset index if we're beyond the new list length
+            if current_index >= len(current_files):
+                current_index = 0
+        
+        if not current_files:
+            print("No images found. Waiting...")
+            time.sleep(2)
+            continue
 
         # Get next image (wrap around if needed)
-        if current_index >= len(image_files):
+        if current_index >= len(current_files):
             current_index = 0
 
-        filename = image_files[current_index]
+        filename = current_files[current_index]
         image_path = os.path.join(IMAGE_FOLDER, filename)
 
         try:
             # Check if file still exists
             if not os.path.exists(image_path):
                 print(f"⚠️  Image deleted: {filename}")
-                # Remove from list and rescan on next iteration
-                image_files.pop(current_index)
+                update_image_list()
                 continue
 
-            print(f"Displaying [{current_index + 1}/{len(image_files)}]: {filename}")
+            # Only display if enough time has passed
+            current_time = time.time()
+            if current_time - last_display_time < DISPLAY_TIME:
+                time.sleep(0.1)
+                continue
+
+            print(f"Displaying [{current_index + 1}/{len(current_files)}]: {filename}")
 
             # Open and process image
             image = Image.open(image_path).convert("RGB")
@@ -187,21 +244,17 @@ def main():
             # Display on framebuffer
             show_image_on_framebuffer(image)
             
-            # Move to next image
+            # Update timing and move to next image
+            last_display_time = current_time
             current_index += 1
-            
-            # Wait before next image
-            time.sleep(DISPLAY_TIME)
 
         except FileNotFoundError:
             print(f"⚠️  Image not found (deleted during display): {filename}")
-            # Remove from list and continue
-            image_files.pop(current_index)
+            update_image_list()
             continue
             
         except Exception as e:
             print(f"❌ Error displaying {filename}: {e}")
-            # Skip this image and move to next
             current_index += 1
             time.sleep(1)
             continue
@@ -222,4 +275,3 @@ if __name__ == "__main__":
         show_cursor()
     finally:
         show_cursor()
-
