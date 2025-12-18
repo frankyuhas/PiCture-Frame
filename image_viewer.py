@@ -127,6 +127,7 @@ def show_cursor():
 
 
 def main():
+    os.system("echo 0 | sudo tee /sys/class/graphics/fbcon/cursor_blink > /dev/null 2>&1")
     # Hide cursor at startup
     hide_cursor()
     
@@ -221,3 +222,4 @@ if __name__ == "__main__":
         show_cursor()
     finally:
         show_cursor()
+
