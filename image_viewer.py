@@ -35,6 +35,40 @@ def get_screen_resolution():
     return int(width), int(height)
 
 
+def fit_image_to_screen(image, screen_width, screen_height):
+    """
+    Resize image to fit screen while maintaining aspect ratio
+    Centers the image on a black background
+    """
+    # Calculate scaling to fit within screen
+    img_ratio = image.width / image.height
+    screen_ratio = screen_width / screen_height
+    
+    if img_ratio > screen_ratio:
+        # Image is wider - fit to width
+        new_width = screen_width
+        new_height = int(screen_width / img_ratio)
+    else:
+        # Image is taller - fit to height
+        new_height = screen_height
+        new_width = int(screen_height * img_ratio)
+    
+    # Resize image maintaining aspect ratio
+    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+    
+    # Create black background
+    final_image = Image.new("RGB", (screen_width, screen_height), (0, 0, 0))
+    
+    # Calculate position to center the image
+    x_offset = (screen_width - new_width) // 2
+    y_offset = (screen_height - new_height) // 2
+    
+    # Paste resized image onto black background
+    final_image.paste(resized_image, (x_offset, y_offset))
+    
+    return final_image
+
+
 def show_image_on_framebuffer(image):
     """
     Converts and writes an image directly to the framebuffer
@@ -125,7 +159,9 @@ def main():
 
             # Open and process image
             image = Image.open(image_path).convert("RGB")
-            image = image.resize((screen_width, screen_height))
+            
+            # Fit image to screen while maintaining aspect ratio
+            image = fit_image_to_screen(image, screen_width, screen_height)
             
             # Display on framebuffer
             show_image_on_framebuffer(image)
