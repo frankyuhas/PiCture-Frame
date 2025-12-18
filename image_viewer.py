@@ -5,6 +5,7 @@ Framebuffer Image Viewer for Raspberry Pi OS Lite (64-bit, Debian Trixie)
 • Writes directly to /dev/fb0
 • Ideal base for HDMI now, E-Ink later
 • Designed for Pi Zero 2 W
+• Handles deleted images gracefully
 """
 
 import os
@@ -19,6 +20,7 @@ from PIL import Image
 IMAGE_FOLDER = "/home/pictureframe/images"
 DISPLAY_TIME = 5  # seconds per image
 FRAMEBUFFER = "/dev/fb0"
+RESCAN_INTERVAL = 30  # seconds - how often to refresh the image list
 
 # ==========================
 # HELPER FUNCTIONS
@@ -54,6 +56,21 @@ def show_image_on_framebuffer(image):
                 fb.write(struct.pack("<H", rgb565))
 
 
+def get_image_list():
+    """
+    Get current list of valid image files
+    """
+    try:
+        image_files = [
+            f for f in os.listdir(IMAGE_FOLDER)
+            if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"))
+        ]
+        return sorted(image_files)
+    except Exception as e:
+        print(f"Error reading image folder: {e}")
+        return []
+
+
 # ==========================
 # MAIN PROGRAM
 # ==========================
@@ -63,36 +80,74 @@ def main():
     screen_width, screen_height = get_screen_resolution()
 
     print(f"Framebuffer resolution: {screen_width}x{screen_height}")
+    print(f"Image folder: {IMAGE_FOLDER}")
+    print(f"Rescanning for new images every {RESCAN_INTERVAL} seconds")
+    print("-" * 50)
 
-    # Load image list
-    image_files = [
-        f for f in os.listdir(IMAGE_FOLDER)
-        if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp"))
-    ]
-
-    image_files.sort()
-
-    if not image_files:
-        print("No images found in", IMAGE_FOLDER)
-        return
+    last_rescan_time = 0
+    image_files = []
+    current_index = 0
 
     # Main display loop
     while True:
-        for filename in image_files:
-            image_path = os.path.join(IMAGE_FOLDER, filename)
-            print("Displaying:", image_path)
+        current_time = time.time()
+        
+        # Rescan for images periodically or if list is empty
+        if not image_files or (current_time - last_rescan_time) >= RESCAN_INTERVAL:
+            print("Scanning for images...")
+            image_files = get_image_list()
+            last_rescan_time = current_time
+            current_index = 0
+            
+            if not image_files:
+                print("No images found. Waiting...")
+                time.sleep(5)
+                continue
+            
+            print(f"Found {len(image_files)} image(s)")
 
-            # Open image
+        # Get next image (wrap around if needed)
+        if current_index >= len(image_files):
+            current_index = 0
+
+        filename = image_files[current_index]
+        image_path = os.path.join(IMAGE_FOLDER, filename)
+
+        try:
+            # Check if file still exists
+            if not os.path.exists(image_path):
+                print(f"⚠️  Image deleted: {filename}")
+                # Remove from list and rescan on next iteration
+                image_files.pop(current_index)
+                continue
+
+            print(f"Displaying [{current_index + 1}/{len(image_files)}]: {filename}")
+
+            # Open and process image
             image = Image.open(image_path).convert("RGB")
-
-            # Resize to screen
             image = image.resize((screen_width, screen_height))
-
+            
             # Display on framebuffer
             show_image_on_framebuffer(image)
-
+            
+            # Move to next image
+            current_index += 1
+            
             # Wait before next image
             time.sleep(DISPLAY_TIME)
+
+        except FileNotFoundError:
+            print(f"⚠️  Image not found (deleted during display): {filename}")
+            # Remove from list and continue
+            image_files.pop(current_index)
+            continue
+            
+        except Exception as e:
+            print(f"❌ Error displaying {filename}: {e}")
+            # Skip this image and move to next
+            current_index += 1
+            time.sleep(1)
+            continue
 
 
 # ==========================
@@ -103,5 +158,6 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nExiting cleanly")
-
+        print("\n\nExiting cleanly")
+    except Exception as e:
+        print(f"\n\nFatal error: {e}")
