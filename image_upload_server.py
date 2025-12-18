@@ -22,7 +22,12 @@ PORT = 8080   # Web page will be http://pi-ip:8080
 # BASIC SETUP
 # ==========================
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder="templates",
+    static_folder="static"
+)
+
 app.config["UPLOAD_FOLDER"] = IMAGE_FOLDER
 
 # Ensure image folder exists
@@ -95,4 +100,5 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
+
 
