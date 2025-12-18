@@ -9,6 +9,7 @@ Framebuffer Image Viewer for Raspberry Pi OS Lite (64-bit, Debian Trixie)
 """
 
 import os
+import sys
 import time
 import struct
 from PIL import Image
@@ -111,16 +112,18 @@ def get_image_list():
 
 def hide_cursor():
     """
-    Hide the blinking cursor in the terminal
+    Hide the blinking cursor in the terminal using ANSI escape codes
     """
-    os.system("setterm -cursor off")
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
 
 
 def show_cursor():
     """
     Show the cursor again (for clean exit)
     """
-    os.system("setterm -cursor on")
+    sys.stdout.write("\033[?25h")
+    sys.stdout.flush()
 
 
 def main():
