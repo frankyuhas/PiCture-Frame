@@ -50,24 +50,7 @@ def allowed_file(filename):
 
 @app.route("/", methods=["GET"])
 def index():
-    """
-    Simple upload page
-    """
-    return """
-    <html>
-        <head>
-            <title>Raspberry Pi Image Upload</title>
-        </head>
-        <body>
-            <h2>Upload Image</h2>
-            <form method="post" action="/upload" enctype="multipart/form-data">
-                <input type="file" name="file" accept="image/*" required>
-                <br><br>
-                <input type="submit" value="Upload">
-            </form>
-        </body>
-    </html>
-    """
+    return render_template("index.html")
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -100,6 +83,7 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
+
 
 
 
