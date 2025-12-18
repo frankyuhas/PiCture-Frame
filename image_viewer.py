@@ -1,109 +1,106 @@
 """
-Simple Image Viewer for Raspberry Pi
-------------------------------------
-• Displays images from a folder
-• Fullscreen HDMI output
-• Cycles images every few seconds
-• Written for Raspberry Pi OS 64-bit
-• Easy to adapt for E-Ink displays later
+Framebuffer Image Viewer for Raspberry Pi OS Lite (64-bit, Debian Trixie)
+------------------------------------------------------------------------
+• No desktop environment required
+• Writes directly to /dev/fb0
+• Ideal base for HDMI now, E-Ink later
+• Designed for Pi Zero 2 W
 """
 
 import os
 import time
-import pygame
+import struct
 from PIL import Image
 
 # ==========================
 # USER SETTINGS
 # ==========================
 
-# Folder where images are stored
 IMAGE_FOLDER = "/home/pi/images"
-
-# Time (in seconds) each image is displayed
-DISPLAY_TIME = 5
-
-# ==========================
-# INITIAL SETUP
-# ==========================
-
-# Initialize pygame
-pygame.init()
-
-# Get screen size automatically
-screen_info = pygame.display.Info()
-SCREEN_WIDTH = screen_info.current_w
-SCREEN_HEIGHT = screen_info.current_h
-
-# Create fullscreen window
-screen = pygame.display.set_mode(
-    (SCREEN_WIDTH, SCREEN_HEIGHT),
-    pygame.FULLSCREEN
-)
-
-# Hide mouse cursor
-pygame.mouse.set_visible(False)
+DISPLAY_TIME = 5  # seconds per image
+FRAMEBUFFER = "/dev/fb0"
 
 # ==========================
-# LOAD IMAGE LIST
+# HELPER FUNCTIONS
 # ==========================
 
-# Get all image files in the folder
-image_files = [
-    f for f in os.listdir(IMAGE_FOLDER)
-    if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp"))
-]
+def get_screen_resolution():
+    """
+    Reads screen resolution from framebuffer
+    """
+    with open("/sys/class/graphics/fb0/virtual_size", "r") as f:
+        width, height = f.read().strip().split(",")
+    return int(width), int(height)
 
-# Sort images alphabetically
-image_files.sort()
 
-# If no images are found, stop the program
-if not image_files:
-    print("No images found in", IMAGE_FOLDER)
-    pygame.quit()
-    exit()
+def show_image_on_framebuffer(image):
+    """
+    Converts and writes an image directly to the framebuffer
+    Assumes RGB565 (most Pi HDMI setups)
+    """
+    with open(FRAMEBUFFER, "wb") as fb:
+        pixels = image.load()
+        for y in range(image.height):
+            for x in range(image.width):
+                r, g, b = pixels[x, y]
 
-# ==========================
-# MAIN LOOP
-# ==========================
+                # Convert RGB888 → RGB565
+                rgb565 = (
+                    ((r & 0xF8) << 8) |
+                    ((g & 0xFC) << 3) |
+                    (b >> 3)
+                )
 
-running = True
-image_index = 0
+                fb.write(struct.pack("<H", rgb565))
 
-while running:
-    # Handle quit events (keyboard / ctrl+c)
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            running = False
-        if event.type == pygame.QUIT:
-            running = False
-
-    # Load image using Pillow
-    image_path = os.path.join(IMAGE_FOLDER, image_files[image_index])
-    image = Image.open(image_path)
-
-    # Resize image to fit screen
-    image = image.resize((SCREEN_WIDTH, SCREEN_HEIGHT))
-
-    # Convert Pillow image to pygame format
-    image_surface = pygame.image.fromstring(
-        image.tobytes(),
-        image.size,
-        image.mode
-    )
-
-    # Draw image to screen
-    screen.blit(image_surface, (0, 0))
-    pygame.display.flip()
-
-    # Wait before showing next image
-    time.sleep(DISPLAY_TIME)
-
-    # Move to next image
-    image_index = (image_index + 1) % len(image_files)
 
 # ==========================
-# CLEAN EXIT
+# MAIN PROGRAM
 # ==========================
 
-pygame.quit()
+def main():
+    # Get screen resolution
+    screen_width, screen_height = get_screen_resolution()
+
+    print(f"Framebuffer resolution: {screen_width}x{screen_height}")
+
+    # Load image list
+    image_files = [
+        f for f in os.listdir(IMAGE_FOLDER)
+        if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp"))
+    ]
+
+    image_files.sort()
+
+    if not image_files:
+        print("No images found in", IMAGE_FOLDER)
+        return
+
+    # Main display loop
+    while True:
+        for filename in image_files:
+            image_path = os.path.join(IMAGE_FOLDER, filename)
+            print("Displaying:", image_path)
+
+            # Open image
+            image = Image.open(image_path).convert("RGB")
+
+            # Resize to screen
+            image = image.resize((screen_width, screen_height))
+
+            # Display on framebuffer
+            show_image_on_framebuffer(image)
+
+            # Wait before next image
+            time.sleep(DISPLAY_TIME)
+
+
+# ==========================
+# ENTRY POINT
+# ==========================
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nExiting cleanly")
