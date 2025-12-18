@@ -109,7 +109,24 @@ def get_image_list():
 # MAIN PROGRAM
 # ==========================
 
+def hide_cursor():
+    """
+    Hide the blinking cursor in the terminal
+    """
+    os.system("setterm -cursor off")
+
+
+def show_cursor():
+    """
+    Show the cursor again (for clean exit)
+    """
+    os.system("setterm -cursor on")
+
+
 def main():
+    # Hide cursor at startup
+    hide_cursor()
+    
     # Get screen resolution
     screen_width, screen_height = get_screen_resolution()
 
@@ -195,5 +212,9 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\n\nExiting cleanly")
+        show_cursor()
     except Exception as e:
         print(f"\n\nFatal error: {e}")
+        show_cursor()
+    finally:
+        show_cursor()
