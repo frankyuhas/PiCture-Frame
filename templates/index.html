@@ -42,7 +42,15 @@
 const dropArea = document.getElementById("drop-area");
 const fileInput = document.getElementById("file-input");
 
-dropArea.addEventListener("click", () => fileInput.click());
+dropArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropArea.classList.remove("highlight");
+    const files = e.dataTransfer.files;
+    if (files.length) {
+        fileInput.files = files; // assign dropped files
+    }
+});
+
 
 // Highlight drop area
 dropArea.addEventListener("dragover", (e) => {
@@ -58,4 +66,5 @@ dropArea.addEventListener("drop", (e) => {
     dropArea.classList.remove("highlight");
     const files = e.dataTransfer.files;
     if
+
 
