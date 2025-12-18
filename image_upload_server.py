@@ -14,7 +14,7 @@ import os
 # USER SETTINGS
 # ==========================
 
-IMAGE_FOLDER = "/home/pictureframe/images"
+IMAGE_FOLDER = "/home/pi/images"
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
 PORT = 8080   # Web page will be http://pi-ip:8080
 
@@ -95,4 +95,3 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
-
