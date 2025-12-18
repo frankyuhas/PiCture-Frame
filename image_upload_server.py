@@ -272,6 +272,7 @@ HTML_TEMPLATE = """
             padding: 15px;
             transition: all 0.3s ease;
             border: 2px solid transparent;
+            position: relative;
         }
 
         .image-card:hover {
@@ -280,12 +281,173 @@ HTML_TEMPLATE = """
             border-color: #667eea;
         }
 
+        .image-card:hover .delete-btn {
+            opacity: 1;
+        }
+
         .image-thumbnail {
             width: 100%;
             height: 150px;
             object-fit: cover;
             border-radius: 8px;
             background: #e0e0e0;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .image-thumbnail:hover {
+            transform: scale(1.05);
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .delete-btn:hover {
+            background: #d32f2f;
+            transform: scale(1.1);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(0,0,0,0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(244, 67, 54, 0.8);
+            transform: rotate(90deg);
+        }
+
+        .confirm-dialog {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-dialog.show {
+            display: flex;
+        }
+
+        .confirm-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .confirm-content h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .confirm-content p {
+            color: #666;
+            margin-bottom: 25px;
+            word-break: break-word;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-btn.delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .confirm-btn.delete:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+        }
+
+        .confirm-btn.cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .confirm-btn.cancel:hover {
+            background: #d0d0d0;
         }
 
         .image-info {
@@ -367,7 +529,8 @@ HTML_TEMPLATE = """
             <div class="image-grid">
                 {% for image in images %}
                 <div class="image-card">
-                    <img src="/images/{{ image.name }}" alt="{{ image.name }}" class="image-thumbnail">
+                    <button class="delete-btn" onclick="confirmDelete('{{ image.name }}')">🗑️</button>
+                    <img src="/images/{{ image.name }}" alt="{{ image.name }}" class="image-thumbnail" onclick="openModal('{{ image.name }}')">
                     <div class="image-info">
                         <div class="image-name" title="{{ image.name }}">{{ image.name }}</div>
                         <div class="image-meta">
@@ -383,6 +546,24 @@ HTML_TEMPLATE = """
                 <p>No images uploaded yet. Start by uploading your first image!</p>
             </div>
             {% endif %}
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div class="modal" id="image-modal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modal-image">
+    </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <div class="confirm-dialog" id="confirm-dialog">
+        <div class="confirm-content">
+            <h3>⚠️ Delete Image?</h3>
+            <p id="confirm-message"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn cancel" onclick="cancelDelete()">Cancel</button>
+                <button class="confirm-btn delete" onclick="executeDelete()">Delete</button>
+            </div>
         </div>
     </div>
 
@@ -487,6 +668,72 @@ HTML_TEMPLATE = """
             message.className = `message ${type} show`;
             message.textContent = text;
         }
+
+        // Image preview modal
+        function openModal(imageName) {
+            const modal = document.getElementById("image-modal");
+            const modalImg = document.getElementById("modal-image");
+            modal.classList.add("show");
+            modalImg.src = `/images/${imageName}`;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById("image-modal");
+            modal.classList.remove("show");
+        }
+
+        // Delete confirmation
+        let imageToDelete = null;
+
+        function confirmDelete(imageName) {
+            imageToDelete = imageName;
+            const dialog = document.getElementById("confirm-dialog");
+            const message = document.getElementById("confirm-message");
+            message.textContent = `Are you sure you want to delete "${imageName}"?`;
+            dialog.classList.add("show");
+        }
+
+        function cancelDelete() {
+            imageToDelete = null;
+            const dialog = document.getElementById("confirm-dialog");
+            dialog.classList.remove("show");
+        }
+
+        async function executeDelete() {
+            if (!imageToDelete) return;
+
+            try {
+                const response = await fetch(`/delete/${imageToDelete}`, {
+                    method: "DELETE"
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    cancelDelete();
+                    location.reload();
+                } else {
+                    alert(`Error: ${result.error || "Failed to delete image"}`);
+                    cancelDelete();
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                cancelDelete();
+            }
+        }
+
+        // Prevent modal from closing when clicking image
+        document.getElementById("modal-image").addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeModal();
+                cancelDelete();
+            }
+        });
     </script>
 </body>
 </html>
@@ -548,6 +795,22 @@ def api_images():
     """API endpoint to get list of images"""
     images = get_uploaded_images()
     return jsonify({"images": images, "count": len(images)})
+
+@app.route("/delete/<filename>", methods=["DELETE"])
+def delete_image(filename):
+    """Delete an uploaded image"""
+    try:
+        # Security: ensure filename doesn't contain path traversal
+        filename = os.path.basename(filename)
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        
+        if not os.path.exists(filepath):
+            return jsonify({"error": "File not found"}), 404
+        
+        os.remove(filepath)
+        return jsonify({"success": True, "message": f"Deleted {filename}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ==========================
 # ENTRY POINT
