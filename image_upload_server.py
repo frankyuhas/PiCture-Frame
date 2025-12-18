@@ -7,17 +7,14 @@ Simple Local Image Upload Web Server for Raspberry Pi
 • Saves files to image folder
 """
 
-from flask import Flask, request, render_template, redirect, url_for, send_from_directory, abort
+from flask import Flask, request, redirect, url_for, send_from_directory, abort
 import os
 
-
-# Absolute path to your project folder
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ==========================
 # USER SETTINGS
 # ==========================
 
-IMAGE_FOLDER = os.path.join(BASE_DIR, "static/images")
+IMAGE_FOLDER = "/home/pi/images"
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
 PORT = 8080   # Web page will be http://pi-ip:8080
 
@@ -25,12 +22,7 @@ PORT = 8080   # Web page will be http://pi-ip:8080
 # BASIC SETUP
 # ==========================
 
-app = Flask(
-    __name__,
-    template_folder="templates",
-    static_folder="static"
-)
-
+app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = IMAGE_FOLDER
 
 # Ensure image folder exists
@@ -46,13 +38,6 @@ def allowed_file(filename):
     """
     ext = os.path.splitext(filename.lower())[1]
     return ext in ALLOWED_EXTENSIONS
-    
-def get_images():
-    """Return a sorted list of image filenames in IMAGE_FOLDER"""
-    return sorted(
-        f for f in os.listdir(IMAGE_FOLDER)
-        if allowed_file(f)
-    )
 
 # ==========================
 # ROUTES
@@ -60,19 +45,48 @@ def get_images():
 
 @app.route("/", methods=["GET"])
 def index():
-    images = get_images()
-    return render_template("index.html", images=images)
+    """
+    Simple upload page
+    """
+    return """
+    <html>
+        <head>
+            <title>Raspberry Pi Image Upload</title>
+        </head>
+        <body>
+            <h2>Upload Image</h2>
+            <form method="post" action="/upload" enctype="multipart/form-data">
+                <input type="file" name="file" accept="image/*" required>
+                <br><br>
+                <input type="submit" value="Upload">
+            </form>
+        </body>
+    </html>
+    """
 
-@app.route("/upload", methods=["POST"])
 @app.route("/upload", methods=["POST"])
 def upload():
-    files = request.files.getlist("file")  # support multiple files
-    for file in files:
-        if file.filename and allowed_file(file.filename):
-            filename = os.path.basename(file.filename)
-            file.save(os.path.join(IMAGE_FOLDER, filename))
-    return redirect(url_for("index"))
+    """
+    Handle uploaded file
+    """
+    if "file" not in request.files:
+        return "No file part", 400
 
+    file = request.files["file"]
+
+    if file.filename == "":
+        return "No selected file", 400
+
+    if not allowed_file(file.filename):
+        return "File type not allowed", 400
+
+    # Sanitize filename (basic)
+    filename = os.path.basename(file.filename)
+
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(save_path)
+
+    return redirect(url_for("index"))
 
 # ==========================
 # ENTRY POINT
@@ -81,11 +95,3 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
-
-
-
-
-
-
-
-
