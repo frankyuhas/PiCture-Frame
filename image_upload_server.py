@@ -10,6 +10,9 @@ Simple Local Image Upload Web Server for Raspberry Pi
 from flask import Flask, request, render_template, redirect, url_for, send_from_directory, abort
 import os
 
+
+# Absolute path to your project folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ==========================
 # USER SETTINGS
 # ==========================
@@ -78,6 +81,7 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
+
 
 
 
