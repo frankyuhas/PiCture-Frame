@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Raspberry Pi Image Upload</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<div class="container">
+    <h1>📷 Image Upload</h1>
+    <p>Upload images to be displayed on the Raspberry Pi.</p>
+
+    <form action="/upload" method="post" enctype="multipart/form-data" class="upload-box">
+        <label class="file-label">
+            <input type="file" name="file" accept="image/*" required>
+            <span>Click or Drag Image Here</span>
+        </label>
+        <button type="submit">Upload Image</button>
+    </form>
+
+    <h2>🖼️ Current Images</h2>
+
+    {% if images %}
+        <ul class="image-list">
+            {% for image in images %}
+                <li>{{ image }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">No images uploaded yet.</p>
+    {% endif %}
+</div>
+
+</body>
+</html>
