@@ -7,7 +7,7 @@ Enhanced Local Image Upload Web Server for Raspberry Pi
 • Mobile-friendly design
 """
 
-from flask import Flask, request, redirect, url_for, jsonify, render_template_string
+from flask import Flask, request, redirect, url_for, jsonify, render_template_string, send_from_directory
 import os
 from datetime import datetime
 
@@ -825,3 +825,4 @@ if __name__ == "__main__":
     print(f"{'='*50}\n")
     
     app.run(host="0.0.0.0", port=PORT, debug=False)
+
