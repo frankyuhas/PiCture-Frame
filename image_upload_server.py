@@ -43,6 +43,13 @@ def allowed_file(filename):
     """
     ext = os.path.splitext(filename.lower())[1]
     return ext in ALLOWED_EXTENSIONS
+    
+def get_images():
+    """Return a sorted list of image filenames in IMAGE_FOLDER"""
+    return sorted(
+        f for f in os.listdir(IMAGE_FOLDER)
+        if allowed_file(f)
+    )
 
 # ==========================
 # ROUTES
@@ -50,7 +57,8 @@ def allowed_file(filename):
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html")
+    images = get_images()
+    return render_template("index.html", images=images)
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -83,6 +91,7 @@ def upload():
 if __name__ == "__main__":
     # Bind to all interfaces so LAN devices can access it
     app.run(host="0.0.0.0", port=PORT)
+
 
 
 
