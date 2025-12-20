@@ -36,7 +36,7 @@ except ImportError:
 # ==========================
 
 IMAGE_FOLDER = "/home/pictureframe/images"
-DISPLAY_TIME = 30  # seconds per image (E-Ink is slow to refresh, ~15-30s)
+DISPLAY_TIME = 90  # seconds per image (E-Ink is slow to refresh, ~15-30s)
 SLEEP_BETWEEN_IMAGES = True  # Put display to sleep to save power
 
 # ==========================
@@ -351,3 +351,4 @@ if __name__ == "__main__":
                 epd.sleep()
             except:
                 pass
+
