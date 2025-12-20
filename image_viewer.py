@@ -12,7 +12,7 @@ import os
 import sys
 import time
 import threading
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 from inotify_simple import INotify, flags
 
 # Import Waveshare E-Paper library
@@ -38,6 +38,13 @@ except ImportError:
 IMAGE_FOLDER = "/home/pictureframe/images"
 DISPLAY_TIME = 30  # seconds per image (E-Ink is slow to refresh, ~15-30s)
 SLEEP_BETWEEN_IMAGES = True  # Put display to sleep to save power
+
+# Image Enhancement Settings
+ENHANCE_IMAGES = True  # Apply image enhancements
+SHARPNESS = 1.5  # 1.0 = original, >1.0 = sharper (try 1.3-2.0)
+CONTRAST = 1.2  # 1.0 = original, >1.0 = more contrast (try 1.1-1.5)
+COLOR_SATURATION = 1.3  # 1.0 = original, >1.0 = more vibrant (try 1.2-1.5)
+BRIGHTNESS = 1.0  # 1.0 = original, >1.0 = brighter, <1.0 = darker
 
 # ==========================
 # GLOBAL STATE
@@ -78,6 +85,37 @@ def init_display():
         print("2. Check wiring connections")
         print("3. Try running with sudo")
         return None
+
+
+def enhance_image(image):
+    """
+    Enhance image quality for E-Ink display
+    Increases sharpness, contrast, and color saturation
+    """
+    if not ENHANCE_IMAGES:
+        return image
+    
+    # Sharpen the image
+    if SHARPNESS != 1.0:
+        enhancer = ImageEnhance.Sharpness(image)
+        image = enhancer.enhance(SHARPNESS)
+    
+    # Adjust contrast
+    if CONTRAST != 1.0:
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(CONTRAST)
+    
+    # Adjust color saturation
+    if COLOR_SATURATION != 1.0:
+        enhancer = ImageEnhance.Color(image)
+        image = enhancer.enhance(COLOR_SATURATION)
+    
+    # Adjust brightness
+    if BRIGHTNESS != 1.0:
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(BRIGHTNESS)
+    
+    return image
 
 
 def fit_image_to_screen(image, screen_width, screen_height):
@@ -300,6 +338,11 @@ def main():
             print("  → Loading image...")
             image = Image.open(image_path).convert("RGB")
             
+            # Enhance image quality
+            if ENHANCE_IMAGES:
+                print("  → Enhancing image...")
+                image = enhance_image(image)
+            
             # Fit image to screen while maintaining aspect ratio
             print("  → Fitting to screen...")
             image = fit_image_to_screen(image, epd.width, epd.height)
@@ -351,5 +394,3 @@ if __name__ == "__main__":
                 epd.sleep()
             except:
                 pass
-
-
