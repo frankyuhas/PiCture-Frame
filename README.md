@@ -10,5 +10,5 @@ Displays images on e-ink digital frame. Also creates a webserver at port 8080 wh
 To install:
 - Raspberry Pi running PiOS lite 64-bit
 - Clone the repo
-- create a service for both image_upload_server.py and image_viewer.py
+- create a service for both image_upload_server.py and image_viewer.py so you can run it at startup.
 - upload images and enjoy
